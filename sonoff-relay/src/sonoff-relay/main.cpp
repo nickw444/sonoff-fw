@@ -40,7 +40,6 @@ typedef struct {
   char  mqttUser[17] = "";
   char  mqttPassword[17] = "";
   int   mqttPort = 8883;
-  char  fingerprint[60] = "";
 } WMSettings;
 
 static WMSettings settings;
@@ -77,6 +76,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length);
 void setup() {
   Serial.begin(115200);
 
+
   makeTopicStrings();
 
   //set led pin as output
@@ -106,12 +106,10 @@ void setup() {
 
   WiFiManagerParameter mqttServerAddress("mqtt-server-address", "MQTT Server Address", settings.mqttAddress, 30);
   WiFiManagerParameter mqttServerPort("mqtt-server-port", "MQTT Server Port", String(settings.mqttPort).c_str(), 6);
-  WiFiManagerParameter mqttServerFingerprint("mqtt-fingerprint", "SSL Fingerprint (disabled if empty)", settings.fingerprint, 60);
   WiFiManagerParameter mqttUsername("mqtt-username", "MQTT User", settings.mqttUser, 16);
   WiFiManagerParameter mqttPassword("mqtt-password", "MQTT Password", settings.mqttPassword, 16);
   wifiManager.addParameter(&mqttServerAddress);
   wifiManager.addParameter(&mqttServerPort);
-  wifiManager.addParameter(&mqttServerFingerprint);
   wifiManager.addParameter(&mqttUsername);
   wifiManager.addParameter(&mqttPassword);
 
@@ -129,7 +127,6 @@ void setup() {
     Serial.println("Saving config");
 
     strcpy(settings.mqttAddress, mqttServerAddress.getValue());
-    strcpy(settings.fingerprint, mqttServerFingerprint.getValue());
     strcpy(settings.mqttUser, mqttUsername.getValue());
     strcpy(settings.mqttPassword, mqttPassword.getValue());
     settings.mqttPort = atoi(mqttServerPort.getValue());
@@ -143,7 +140,6 @@ void setup() {
   Serial.println("Device is started...");
   Serial.printf("settings.mqttAddress: '%s'\n", settings.mqttAddress);
   Serial.printf("settings.mqttPort: '%d'\n", settings.mqttPort);
-  Serial.printf("settings.fingerprint: '%s'\n", settings.fingerprint);
   Serial.printf("settings.mqttUser: '%s'\n", settings.mqttUser);
   Serial.printf("settings.mqttPassword: '%s'\n", settings.mqttPassword);
   Serial.printf("topicRelaySet: '%s'\n", topicRelaySet.c_str());
@@ -245,22 +241,6 @@ void onSaveConfig() {
 }
 
 void mqttReconnect() {
-
-  if (settings.fingerprint[0] != 0) {
-    Serial.println("Verifying SSL Fingerprint");
-    if (!espClient.connect(settings.mqttAddress, settings.mqttPort)) {
-      Serial.println("Failed to connect.");
-      return;
-    }
-
-    if (!espClient.verify(settings.fingerprint, settings.mqttAddress)) {
-      Serial.println("SSL Fingerprint verification failed.");
-      return;
-    }
-  } else {
-      Serial.println("SSL Verification Disabled.");
-  }
-
   Serial.println("Attempting MQTT connection...");
   // Create a random client ID
   String clientId = "esp-";
