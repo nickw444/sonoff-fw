@@ -1,18 +1,26 @@
+#ifndef HOMEKIT_SONOFF_H_
+#define HOMEKIT_SONOFF_H_
+
 #include <Ticker.h>
 #include <Button.h>
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <WiFiManager.h>
 #include <EEPROM.h>
+#include <Arduino.h>
 
 #define TOPIC_REBOOT  "reboot"
 #define TOPIC_RESET   "reset"
 
-#define HOMEKIT_CALLBACK_SIGNATURE std::function<void(byte *, unsigned int)>
+#define HOMEKIT_CALLBACK_SIGNATURE std::function<void(char *, unsigned int)>
+#define ON_CONNECT_SIGNATURE std::function<void(void)>
+#define ON_BUTTON_PRESS_SIGNATURE ON_CONNECT_SIGNATURE
 
-struct Subscription {
-  HOMEKIT_CALLBACK_SIGNATURE cb;
-  String topic;
+class Subscription {
+  public:
+    HOMEKIT_CALLBACK_SIGNATURE cb;
+    String topic;
+    Subscription *next;
 };
 
 struct WMSettings {
@@ -26,18 +34,22 @@ struct WMSettings {
 class Homekit {
   public:
     Homekit(uint8_t buttonPin, uint8_t ledPin, uint16_t eeprom_salt);
+    Homekit(uint8_t buttonPin, uint8_t ledPin, uint16_t eeprom_salt, String willTopic, char * willMsg);
     void beginConfig();
     void tick();
 
+    void onConnect(ON_CONNECT_SIGNATURE callback);
+    void onButtonPress(ON_BUTTON_PRESS_SIGNATURE callback);
+
     void subscribeTo(String topic, HOMEKIT_CALLBACK_SIGNATURE callback);
-    void publish(String topic, byte * data);
-    void onSaveConfig();
+    void publish(String topic, char * data);
 
     void reboot();
     void reset();
 
-    String getPlainMac(void);
+    static String getPlainMac(void);
     String hostname;
+    String macAddress;
 
   private:
     Ticker ticker;
@@ -46,23 +58,37 @@ class Homekit {
     WiFiClientSecure espClient;
     PubSubClient* client;
 
-    struct Subscription subscriptions[];
-    struct WMSettings settings;
-
+    uint8_t buttonPin;
+    uint8_t ledPin;
     uint16_t eepromSalt;
-
-
-    void tickLED();
-    void onEnterConfigMode(WiFiManager *wifi);
-
-
-
-    void mqttCallback(char * topic, byte * payload, unsigned int length);
-    void mqttReconnect();
+    String willTopic;
+    char * willMsg;
 
     bool shouldSaveConfig = false;
 
+    Subscription * subscriptions;
+    struct WMSettings settings;
 
-    uint8_t buttonPin;
-    uint8_t ledPin;
+    ON_CONNECT_SIGNATURE onConnectCallback;
+    ON_BUTTON_PRESS_SIGNATURE onButtonPressCallback;
+
+    void mqttReconnect();
+
+    void mqttCallback(char * topic, byte * payload, unsigned int length);
+    static void _mqttCallback(char * topic, byte * payload, unsigned int length);
+
+    void tickLED();
+    static void _tickLED();
+
+    void onEnterConfigMode(WiFiManager *wifi);
+    static void _onEnterConfigMode(WiFiManager *wifi);
+
+    void onSaveConfig();
+    static void _onSaveConfig();
+
+    void init(uint8_t buttonPin, uint8_t ledPin, uint16_t eepromSalt);
+    String makeTopicString(String topic);
 };
+
+
+#endif /* HOMEKIT_SONOFF_H_ */
